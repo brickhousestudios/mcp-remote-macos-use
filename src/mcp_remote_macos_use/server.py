@@ -41,6 +41,22 @@ from action_handlers import (
     handle_remote_macos_mouse_drag_n_drop
 )
 
+# Import semantic action handlers (Accessibility API + MLX)
+try:
+    from semantic_handlers import (
+        handle_macos_find_element,
+        handle_macos_click_element,
+        handle_macos_type_text_semantic,
+        handle_macos_get_focused_app,
+        handle_macos_launch_app_native,
+        handle_macos_get_capabilities
+    )
+    SEMANTIC_HANDLERS_AVAILABLE = True
+    logger.info("Semantic handlers (Accessibility API) loaded successfully")
+except ImportError as e:
+    SEMANTIC_HANDLERS_AVAILABLE = False
+    logger.warning(f"Semantic handlers not available: {e}")
+
 # Configure logging
 logging.basicConfig(
     level=logging.DEBUG,
@@ -248,7 +264,74 @@ async def main():
                     "required": ["start_x", "start_y", "end_x", "end_y"]
                 },
             ),
-        ]
+        ] + ([
+            # Semantic UI control tools (Accessibility API + MLX Vision)
+            # Only available on macOS with proper permissions
+            types.Tool(
+                name="macos_find_element",
+                description="Find UI elements by name, role, or properties using native Accessibility API. Much faster than VNC for local control. Requires macOS with Accessibility permissions.",
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "name": {"type": "string", "description": "Element name/title to search for"},
+                        "role": {"type": "string", "description": "Element role (e.g., 'AXButton', 'AXTextField', 'AXMenuItem')"},
+                        "app_name": {"type": "string", "description": "Limit search to specific application"}
+                    },
+                    "required": []
+                },
+            ),
+            types.Tool(
+                name="macos_click_element",
+                description="Click a UI element by its name/title (semantic click). No coordinates needed! Uses native Accessibility API. Requires macOS with Accessibility permissions.",
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "name": {"type": "string", "description": "Element name/title to click"},
+                        "role": {"type": "string", "description": "Optional element role filter (e.g., 'AXButton')"},
+                        "app_name": {"type": "string", "description": "Optional: limit to specific application"}
+                    },
+                    "required": ["name"]
+                },
+            ),
+            types.Tool(
+                name="macos_type_text_native",
+                description="Type text into the currently focused text field using native APIs. Faster and more reliable than VNC. Requires macOS with Accessibility permissions.",
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "text": {"type": "string", "description": "Text to type"}
+                    },
+                    "required": ["text"]
+                },
+            ),
+            types.Tool(
+                name="macos_get_focused_app",
+                description="Get information about the currently focused application. Uses native APIs. Requires macOS with Accessibility permissions.",
+                inputSchema={
+                    "type": "object",
+                    "properties": {}
+                },
+            ),
+            types.Tool(
+                name="macos_launch_app_native",
+                description="Launch an application using native macOS APIs (faster than VNC/Spotlight method). Requires macOS with Accessibility permissions.",
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "app_name": {"type": "string", "description": "Application name or bundle ID"}
+                    },
+                    "required": ["app_name"]
+                },
+            ),
+            types.Tool(
+                name="macos_get_capabilities",
+                description="Get the available control capabilities (Accessibility API, VNC, MLX Vision) and current control method being used.",
+                inputSchema={
+                    "type": "object",
+                    "properties": {}
+                },
+            ),
+        ] if SEMANTIC_HANDLERS_AVAILABLE else [])
 
     @server.call_tool()
     async def handle_call_tool(
@@ -282,6 +365,25 @@ async def main():
 
             elif name == "remote_macos_mouse_drag_n_drop":
                 return handle_remote_macos_mouse_drag_n_drop(arguments)
+
+            # Semantic UI control tools (Accessibility API)
+            elif name == "macos_find_element" and SEMANTIC_HANDLERS_AVAILABLE:
+                return handle_macos_find_element(arguments)
+
+            elif name == "macos_click_element" and SEMANTIC_HANDLERS_AVAILABLE:
+                return handle_macos_click_element(arguments)
+
+            elif name == "macos_type_text_native" and SEMANTIC_HANDLERS_AVAILABLE:
+                return handle_macos_type_text_semantic(arguments)
+
+            elif name == "macos_get_focused_app" and SEMANTIC_HANDLERS_AVAILABLE:
+                return handle_macos_get_focused_app(arguments)
+
+            elif name == "macos_launch_app_native" and SEMANTIC_HANDLERS_AVAILABLE:
+                return handle_macos_launch_app_native(arguments)
+
+            elif name == "macos_get_capabilities" and SEMANTIC_HANDLERS_AVAILABLE:
+                return handle_macos_get_capabilities(arguments)
 
             else:
                 raise ValueError(f"Unknown tool: {name}")
