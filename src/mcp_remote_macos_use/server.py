@@ -57,7 +57,7 @@ except ImportError as e:
     SEMANTIC_HANDLERS_AVAILABLE = False
     logger.warning(f"Semantic handlers not available: {e}")
 
-# Import advanced handlers (AppleScript, clipboard, system, batch, element extraction)
+# Import advanced handlers (AppleScript, clipboard, system, batch, element extraction, smart waiting, visual debugging)
 try:
     from advanced_handlers import (
         handle_execute_applescript,
@@ -73,10 +73,15 @@ try:
         handle_get_bounding_boxes,
         handle_extract_form_fields,
         handle_extract_clickable_elements,
-        handle_extract_text_content
+        handle_extract_text_content,
+        handle_wait_for_element,
+        handle_wait_for_element_property,
+        handle_capture_annotated_screenshot,
+        handle_highlight_element,
+        handle_visualize_element_tree
     )
     ADVANCED_HANDLERS_AVAILABLE = True
-    logger.info("Advanced handlers (AppleScript, clipboard, system, extraction) loaded successfully")
+    logger.info("Advanced handlers (AppleScript, clipboard, system, extraction, smart waiting, visual debugging) loaded successfully")
 except ImportError as e:
     ADVANCED_HANDLERS_AVAILABLE = False
     logger.warning(f"Advanced handlers not available: {e}")
@@ -524,6 +529,77 @@ async def main():
                     }
                 },
             ),
+            types.Tool(
+                name="wait_for_element",
+                description="Wait for UI element to appear on screen. Returns when element is found or timeout is reached. Perfect for waiting for dynamic content, page loads, or UI state changes. Requires macOS with Accessibility permissions.",
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "name": {"type": "string", "description": "Optional: element name/title to search for"},
+                        "role": {"type": "string", "description": "Optional: element role (e.g., 'AXButton', 'AXTextField')"},
+                        "app_name": {"type": "string", "description": "Optional: limit search to specific application"},
+                        "timeout": {"type": "number", "description": "Optional: timeout in seconds (default: 10.0)"},
+                        "poll_interval": {"type": "number", "description": "Optional: polling interval in seconds (default: 0.5)"},
+                        "min_count": {"type": "integer", "description": "Optional: minimum number of elements to find (default: 1)"}
+                    }
+                },
+            ),
+            types.Tool(
+                name="wait_for_element_property",
+                description="Wait for element property to reach expected value. Returns when property condition is met or timeout is reached. Perfect for waiting for text changes, state changes, or loading indicators. Requires macOS with Accessibility permissions.",
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "name": {"type": "string", "description": "Optional: element name/title"},
+                        "role": {"type": "string", "description": "Optional: element role"},
+                        "app_name": {"type": "string", "description": "Optional: limit to specific application"},
+                        "property_name": {"type": "string", "description": "Property to check (e.g., 'AXValue', 'AXEnabled') - default: 'AXValue'"},
+                        "expected_value": {"type": "string", "description": "Expected value (omit for any non-None value)"},
+                        "timeout": {"type": "number", "description": "Optional: timeout in seconds (default: 10.0)"},
+                        "poll_interval": {"type": "number", "description": "Optional: polling interval in seconds (default: 0.5)"}
+                    }
+                },
+            ),
+            types.Tool(
+                name="capture_annotated_screenshot",
+                description="Capture screenshot and annotate with element bounding boxes. All UI elements are outlined with colored boxes and labeled. Perfect for debugging UI automation and visualizing screen structure. Requires macOS with Accessibility permissions and PIL/Pillow.",
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "app_name": {"type": "string", "description": "Optional: limit to specific application"},
+                        "role_filter": {"type": "array", "items": {"type": "string"}, "description": "Optional: only show specific element roles"},
+                        "output_path": {"type": "string", "description": "Optional: output file path (default: temp file)"},
+                        "show_labels": {"type": "boolean", "description": "Optional: show element labels (default: true)"},
+                        "show_roles": {"type": "boolean", "description": "Optional: show element roles in labels (default: false)"}
+                    }
+                },
+            ),
+            types.Tool(
+                name="highlight_element",
+                description="Capture screenshot and highlight specific element. The target element is outlined with a thick colored box. Perfect for debugging element location and verifying automation targets. Requires macOS with Accessibility permissions and PIL/Pillow.",
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "element_name": {"type": "string", "description": "REQUIRED: element name to highlight"},
+                        "role": {"type": "string", "description": "Optional: element role filter"},
+                        "app_name": {"type": "string", "description": "Optional: limit to specific application"},
+                        "output_path": {"type": "string", "description": "Optional: output file path (default: temp file)"}
+                    },
+                    "required": ["element_name"]
+                },
+            ),
+            types.Tool(
+                name="visualize_element_tree",
+                description="Create text visualization of UI element hierarchy. Generates ASCII tree showing element structure, roles, and relationships. Perfect for understanding screen structure and planning automation. Requires macOS with Accessibility permissions.",
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "app_name": {"type": "string", "description": "Optional: limit to specific application"},
+                        "max_depth": {"type": "integer", "description": "Optional: maximum tree depth (default: 5)"},
+                        "output_path": {"type": "string", "description": "Optional: output file path (default: temp file)"}
+                    }
+                },
+            ),
         ] if ADVANCED_HANDLERS_AVAILABLE else [])
 
     @server.call_tool()
@@ -621,6 +697,23 @@ async def main():
 
             elif name == "extract_text_content" and ADVANCED_HANDLERS_AVAILABLE:
                 return handle_extract_text_content(arguments)
+
+            # Smart waiting tools
+            elif name == "wait_for_element" and ADVANCED_HANDLERS_AVAILABLE:
+                return handle_wait_for_element(arguments)
+
+            elif name == "wait_for_element_property" and ADVANCED_HANDLERS_AVAILABLE:
+                return handle_wait_for_element_property(arguments)
+
+            # Visual debugging tools
+            elif name == "capture_annotated_screenshot" and ADVANCED_HANDLERS_AVAILABLE:
+                return handle_capture_annotated_screenshot(arguments)
+
+            elif name == "highlight_element" and ADVANCED_HANDLERS_AVAILABLE:
+                return handle_highlight_element(arguments)
+
+            elif name == "visualize_element_tree" and ADVANCED_HANDLERS_AVAILABLE:
+                return handle_visualize_element_tree(arguments)
 
             else:
                 raise ValueError(f"Unknown tool: {name}")

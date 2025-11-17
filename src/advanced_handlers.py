@@ -33,6 +33,20 @@ try:
 except ImportError:
     ELEMENT_EXTRACTION_AVAILABLE = False
 
+# Import smart waiting
+try:
+    from smart_waiting import SmartWaiter, WaitResult
+    SMART_WAITING_AVAILABLE = True
+except ImportError:
+    SMART_WAITING_AVAILABLE = False
+
+# Import visual debugging
+try:
+    from visual_debugging import VisualDebugger
+    VISUAL_DEBUGGING_AVAILABLE = True
+except ImportError:
+    VISUAL_DEBUGGING_AVAILABLE = False
+
 # Import for batch operations
 from action_handlers import (
     handle_remote_macos_mouse_click,
@@ -706,4 +720,298 @@ def handle_extract_text_content(arguments: dict[str, Any]) -> list[types.TextCon
 
     except Exception as e:
         logger.error(f"Error extracting text content: {e}", exc_info=True)
+        return [types.TextContent(type="text", text=f"Error: {str(e)}")]
+
+
+# Smart Waiting Handlers
+
+def handle_wait_for_element(arguments: dict[str, Any]) -> list[types.TextContent]:
+    """
+    Wait for UI element to appear.
+
+    Args:
+        arguments: Dict with:
+            - name: Optional element name/title
+            - role: Optional element role (e.g., "AXButton")
+            - app_name: Optional app name to limit search
+            - timeout: Optional timeout in seconds (default: 10.0)
+            - poll_interval: Optional polling interval (default: 0.5)
+            - min_count: Optional minimum element count (default: 1)
+
+    Returns:
+        Wait result with found elements
+    """
+    if not SMART_WAITING_AVAILABLE:
+        return [types.TextContent(
+            type="text",
+            text="Smart waiting not available. Requires macOS with Accessibility API."
+        )]
+
+    name = arguments.get("name")
+    role = arguments.get("role")
+    app_name = arguments.get("app_name")
+    timeout = arguments.get("timeout", 10.0)
+    poll_interval = arguments.get("poll_interval", 0.5)
+    min_count = arguments.get("min_count", 1)
+
+    try:
+        waiter = SmartWaiter()
+        result, elements, error = waiter.wait_for_element(
+            name=name,
+            role=role,
+            app_name=app_name,
+            timeout=timeout,
+            poll_interval=poll_interval,
+            min_count=min_count
+        )
+
+        if result == WaitResult.SUCCESS:
+            return [types.TextContent(
+                type="text",
+                text=f"✓ Found {len(elements)} element(s) matching criteria\n\n" +
+                     f"Search: name={name}, role={role}, app={app_name}\n" +
+                     f"Elements are ready for interaction."
+            )]
+        elif result == WaitResult.TIMEOUT:
+            return [types.TextContent(
+                type="text",
+                text=f"✗ Timeout waiting for element\n\nError: {error}"
+            )]
+        else:
+            return [types.TextContent(
+                type="text",
+                text=f"✗ Error waiting for element\n\nError: {error}"
+            )]
+
+    except Exception as e:
+        logger.error(f"Error in wait_for_element: {e}", exc_info=True)
+        return [types.TextContent(type="text", text=f"Error: {str(e)}")]
+
+
+def handle_wait_for_element_property(arguments: dict[str, Any]) -> list[types.TextContent]:
+    """
+    Wait for element property to reach expected value.
+
+    Args:
+        arguments: Dict with:
+            - name: Optional element name
+            - role: Optional element role
+            - app_name: Optional app name
+            - property_name: Property to check (e.g., "AXValue", "AXEnabled")
+            - expected_value: Expected value (None = any non-None value)
+            - timeout: Optional timeout (default: 10.0)
+            - poll_interval: Optional polling interval (default: 0.5)
+
+    Returns:
+        Wait result with property value
+    """
+    if not SMART_WAITING_AVAILABLE:
+        return [types.TextContent(
+            type="text",
+            text="Smart waiting not available. Requires macOS with Accessibility API."
+        )]
+
+    name = arguments.get("name")
+    role = arguments.get("role")
+    app_name = arguments.get("app_name")
+    property_name = arguments.get("property_name", "AXValue")
+    expected_value = arguments.get("expected_value")
+    timeout = arguments.get("timeout", 10.0)
+    poll_interval = arguments.get("poll_interval", 0.5)
+
+    try:
+        waiter = SmartWaiter()
+        result, actual_value, error = waiter.wait_for_element_property(
+            name=name,
+            role=role,
+            app_name=app_name,
+            property_name=property_name,
+            expected_value=expected_value,
+            timeout=timeout,
+            poll_interval=poll_interval
+        )
+
+        if result == WaitResult.SUCCESS:
+            return [types.TextContent(
+                type="text",
+                text=f"✓ Property condition met\n\n" +
+                     f"Element: name={name}, role={role}\n" +
+                     f"Property: {property_name}={actual_value}"
+            )]
+        elif result == WaitResult.TIMEOUT:
+            return [types.TextContent(
+                type="text",
+                text=f"✗ Timeout waiting for property\n\nError: {error}"
+            )]
+        else:
+            return [types.TextContent(
+                type="text",
+                text=f"✗ Error waiting for property\n\nError: {error}"
+            )]
+
+    except Exception as e:
+        logger.error(f"Error in wait_for_element_property: {e}", exc_info=True)
+        return [types.TextContent(type="text", text=f"Error: {str(e)}")]
+
+
+# Visual Debugging Handlers
+
+def handle_capture_annotated_screenshot(arguments: dict[str, Any]) -> list[types.TextContent]:
+    """
+    Capture screenshot and annotate with element bounding boxes.
+
+    Args:
+        arguments: Dict with:
+            - app_name: Optional app name to limit elements
+            - role_filter: Optional list of roles to show
+            - output_path: Optional output path (default: temp file)
+            - show_labels: Optional show element labels (default: True)
+            - show_roles: Optional show element roles (default: False)
+
+    Returns:
+        Path to annotated screenshot
+    """
+    if not VISUAL_DEBUGGING_AVAILABLE:
+        return [types.TextContent(
+            type="text",
+            text="Visual debugging not available. Requires macOS with PIL/Pillow installed."
+        )]
+
+    app_name = arguments.get("app_name")
+    role_filter = arguments.get("role_filter")
+    output_path = arguments.get("output_path")
+    show_labels = arguments.get("show_labels", True)
+    show_roles = arguments.get("show_roles", False)
+
+    try:
+        debugger = VisualDebugger()
+        success, path, error = debugger.capture_and_annotate(
+            app_name=app_name,
+            role_filter=role_filter,
+            output_path=output_path,
+            show_labels=show_labels,
+            show_roles=show_roles
+        )
+
+        if success:
+            return [types.TextContent(
+                type="text",
+                text=f"✓ Annotated screenshot saved\n\nPath: {path}\n\n" +
+                     f"Screenshot shows all UI elements with colored bounding boxes.\n" +
+                     f"Colors indicate element types (red=buttons, green=text fields, etc.)"
+            )]
+        else:
+            return [types.TextContent(
+                type="text",
+                text=f"✗ Failed to capture annotated screenshot\n\nError: {error}"
+            )]
+
+    except Exception as e:
+        logger.error(f"Error capturing annotated screenshot: {e}", exc_info=True)
+        return [types.TextContent(type="text", text=f"Error: {str(e)}")]
+
+
+def handle_highlight_element(arguments: dict[str, Any]) -> list[types.TextContent]:
+    """
+    Capture screenshot and highlight specific element.
+
+    Args:
+        arguments: Dict with:
+            - element_name: Element name to highlight (required)
+            - role: Optional element role
+            - app_name: Optional app name
+            - output_path: Optional output path
+
+    Returns:
+        Path to highlighted screenshot
+    """
+    if not VISUAL_DEBUGGING_AVAILABLE:
+        return [types.TextContent(
+            type="text",
+            text="Visual debugging not available. Requires macOS with PIL/Pillow installed."
+        )]
+
+    element_name = arguments.get("element_name")
+    role = arguments.get("role")
+    app_name = arguments.get("app_name")
+    output_path = arguments.get("output_path")
+
+    if not element_name:
+        raise ValueError("element_name is required")
+
+    try:
+        from visual_debugging import highlight_element_on_screen
+
+        success, path, error = highlight_element_on_screen(
+            element_name=element_name,
+            role=role,
+            app_name=app_name
+        )
+
+        if success:
+            return [types.TextContent(
+                type="text",
+                text=f"✓ Element highlighted on screenshot\n\nPath: {path}\n\n" +
+                     f"Highlighted element: {element_name}"
+            )]
+        else:
+            return [types.TextContent(
+                type="text",
+                text=f"✗ Failed to highlight element\n\nError: {error}"
+            )]
+
+    except Exception as e:
+        logger.error(f"Error highlighting element: {e}", exc_info=True)
+        return [types.TextContent(type="text", text=f"Error: {str(e)}")]
+
+
+def handle_visualize_element_tree(arguments: dict[str, Any]) -> list[types.TextContent]:
+    """
+    Create text visualization of UI element tree.
+
+    Args:
+        arguments: Dict with:
+            - app_name: Optional app name
+            - max_depth: Optional max tree depth (default: 5)
+            - output_path: Optional output path
+
+    Returns:
+        Path to element tree visualization
+    """
+    if not VISUAL_DEBUGGING_AVAILABLE:
+        return [types.TextContent(
+            type="text",
+            text="Visual debugging not available. Requires macOS with Accessibility API."
+        )]
+
+    app_name = arguments.get("app_name")
+    max_depth = arguments.get("max_depth", 5)
+    output_path = arguments.get("output_path")
+
+    try:
+        debugger = VisualDebugger()
+        success, path, error = debugger.visualize_element_tree(
+            app_name=app_name,
+            max_depth=max_depth,
+            output_path=output_path
+        )
+
+        if success:
+            # Also read and return the content
+            with open(path, 'r') as f:
+                content = f.read()
+
+            return [types.TextContent(
+                type="text",
+                text=f"✓ Element tree visualization saved\n\nPath: {path}\n\n" +
+                     f"Preview:\n{content[:2000]}..." if len(content) > 2000 else content
+            )]
+        else:
+            return [types.TextContent(
+                type="text",
+                text=f"✗ Failed to visualize element tree\n\nError: {error}"
+            )]
+
+    except Exception as e:
+        logger.error(f"Error visualizing element tree: {e}", exc_info=True)
         return [types.TextContent(type="text", text=f"Error: {str(e)}")]
