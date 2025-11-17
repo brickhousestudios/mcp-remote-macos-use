@@ -21,6 +21,21 @@ bash setup_mcp.sh
 
 📚 **[Full Setup Guide](MCP_SETUP.md)** | 🎯 **42 Available Tools** | 🔧 **[Troubleshooting](MCP_SETUP.md#troubleshooting)**
 
+## 🐳 Docker / VM Support
+
+**Run macOS VM inside Docker with QEMU!**
+
+```bash
+# Option 1: Connect to existing Mac
+docker-compose --profile basic up -d
+
+# Option 2: Run macOS VM in Docker (requires KVM)
+docker-compose --profile vm up -d
+# Connect VNC to localhost:5900 to complete setup
+```
+
+🚢 **[Docker Setup Guide](DOCKER_SETUP.md)** - Complete instructions for running macOS VMs in Docker
+
 **Showcases**
 - Research Twitter and Post Twitter(https://www.youtube.com/watch?v=--QHz2jcvcs)
 <img width="400" alt="image" src="https://github.com/user-attachments/assets/bfe6e354-3d59-4d08-855b-2eecdaaeb46f" />

@@ -1,0 +1,59 @@
+# Dockerfile for MCP Server with macOS VM (QEMU/KVM)
+# Based on OSX-KVM project
+
+FROM python:3.11-slim
+
+# Install QEMU, KVM, and dependencies
+RUN apt-get update && apt-get install -y \
+    qemu-system-x86 \
+    qemu-utils \
+    qemu-kvm \
+    libvirt-daemon-system \
+    libvirt-clients \
+    bridge-utils \
+    virt-manager \
+    ovmf \
+    curl \
+    git \
+    wget \
+    dmg2img \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copy MCP server code
+COPY pyproject.toml uv.lock ./
+COPY src/ ./src/
+
+# Install MCP server
+RUN pip install --no-cache-dir -e .
+
+# Create directories for VM
+RUN mkdir -p /vm-data /app/logs
+
+# Download OSX-KVM scripts
+RUN git clone --depth 1 https://github.com/kholia/OSX-KVM.git /opt/OSX-KVM && \
+    cd /opt/OSX-KVM && \
+    chmod +x *.sh
+
+# Copy startup script
+COPY docker/start-macos-vm.sh /usr/local/bin/start-macos-vm.sh
+RUN chmod +x /usr/local/bin/start-macos-vm.sh
+
+# Environment variables
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONPATH=/app/src
+ENV RAM=8G
+ENV CORES=4
+ENV MACOS_HOST=localhost
+ENV MACOS_PORT=5900
+
+# Expose ports
+EXPOSE 8080 5900 10022
+
+# Health check
+HEALTHCHECK --interval=60s --timeout=10s --start-period=120s --retries=3 \
+    CMD curl -f http://localhost:8080/health || exit 1
+
+# Start VM and MCP server
+CMD ["/usr/local/bin/start-macos-vm.sh"]
