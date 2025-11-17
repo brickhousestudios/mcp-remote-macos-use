@@ -57,6 +57,24 @@ except ImportError as e:
     SEMANTIC_HANDLERS_AVAILABLE = False
     logger.warning(f"Semantic handlers not available: {e}")
 
+# Import advanced handlers (AppleScript, clipboard, system, batch)
+try:
+    from advanced_handlers import (
+        handle_execute_applescript,
+        handle_applescript_tell_app,
+        handle_read_clipboard,
+        handle_write_clipboard,
+        handle_set_volume,
+        handle_get_volume,
+        handle_system_action,
+        handle_batch_operations
+    )
+    ADVANCED_HANDLERS_AVAILABLE = True
+    logger.info("Advanced handlers (AppleScript, clipboard, system) loaded successfully")
+except ImportError as e:
+    ADVANCED_HANDLERS_AVAILABLE = False
+    logger.warning(f"Advanced handlers not available: {e}")
+
 # Configure logging
 logging.basicConfig(
     level=logging.DEBUG,
@@ -331,7 +349,110 @@ async def main():
                     "properties": {}
                 },
             ),
-        ] if SEMANTIC_HANDLERS_AVAILABLE else [])
+        ] if SEMANTIC_HANDLERS_AVAILABLE else []) + ([
+            # Advanced automation tools (AppleScript, clipboard, system controls, batch)
+            types.Tool(
+                name="execute_applescript",
+                description="Execute an AppleScript for advanced macOS automation. Enables complex tasks like app-specific automation, file operations, system integration. Requires macOS.",
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "script": {"type": "string", "description": "AppleScript code to execute"},
+                        "timeout": {"type": "integer", "description": "Timeout in seconds (default: 30)", "default": 30}
+                    },
+                    "required": ["script"]
+                },
+            ),
+            types.Tool(
+                name="applescript_tell_app",
+                description="Send an AppleScript command to a specific application (e.g., 'tell Safari to open location...'). Easier than writing full AppleScript. Requires macOS.",
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "app_name": {"type": "string", "description": "Application name"},
+                        "command": {"type": "string", "description": "AppleScript command(s) to send to the app"},
+                        "timeout": {"type": "integer", "description": "Timeout in seconds (default: 30)", "default": 30}
+                    },
+                    "required": ["app_name", "command"]
+                },
+            ),
+            types.Tool(
+                name="read_clipboard",
+                description="Read text from the system clipboard. Useful for getting copied text, URLs, etc. Requires macOS with PyObjC.",
+                inputSchema={
+                    "type": "object",
+                    "properties": {}
+                },
+            ),
+            types.Tool(
+                name="write_clipboard",
+                description="Write text to the system clipboard. Useful for copying text for pasting elsewhere. Requires macOS with PyObjC.",
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "text": {"type": "string", "description": "Text to write to clipboard"}
+                    },
+                    "required": ["text"]
+                },
+            ),
+            types.Tool(
+                name="set_volume",
+                description="Set the system volume level. Requires macOS.",
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "level": {"type": "integer", "description": "Volume level (0-100)", "minimum": 0, "maximum": 100}
+                    },
+                    "required": ["level"]
+                },
+            ),
+            types.Tool(
+                name="get_volume",
+                description="Get the current system volume level. Requires macOS.",
+                inputSchema={
+                    "type": "object",
+                    "properties": {}
+                },
+            ),
+            types.Tool(
+                name="system_action",
+                description="Perform system actions: lock screen, sleep, logout, mute/unmute. Requires macOS.",
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "action": {
+                            "type": "string",
+                            "description": "Action to perform",
+                            "enum": ["lock", "sleep", "logout", "mute", "unmute"]
+                        }
+                    },
+                    "required": ["action"]
+                },
+            ),
+            types.Tool(
+                name="batch_operations",
+                description="Execute multiple operations in sequence efficiently. Useful for complex workflows. Supports all mouse/keyboard/semantic tools.",
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "operations": {
+                            "type": "array",
+                            "description": "List of operations to execute",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "tool": {"type": "string", "description": "Tool name to execute"},
+                                    "arguments": {"type": "object", "description": "Arguments for the tool"},
+                                    "delay_ms": {"type": "integer", "description": "Delay after this operation (default: 100ms)", "default": 100}
+                                },
+                                "required": ["tool", "arguments"]
+                            }
+                        }
+                    },
+                    "required": ["operations"]
+                },
+            ),
+        ] if ADVANCED_HANDLERS_AVAILABLE else [])
 
     @server.call_tool()
     async def handle_call_tool(
@@ -384,6 +505,31 @@ async def main():
 
             elif name == "macos_get_capabilities" and SEMANTIC_HANDLERS_AVAILABLE:
                 return handle_macos_get_capabilities(arguments)
+
+            # Advanced automation tools (AppleScript, clipboard, system, batch)
+            elif name == "execute_applescript" and ADVANCED_HANDLERS_AVAILABLE:
+                return handle_execute_applescript(arguments)
+
+            elif name == "applescript_tell_app" and ADVANCED_HANDLERS_AVAILABLE:
+                return handle_applescript_tell_app(arguments)
+
+            elif name == "read_clipboard" and ADVANCED_HANDLERS_AVAILABLE:
+                return handle_read_clipboard(arguments)
+
+            elif name == "write_clipboard" and ADVANCED_HANDLERS_AVAILABLE:
+                return handle_write_clipboard(arguments)
+
+            elif name == "set_volume" and ADVANCED_HANDLERS_AVAILABLE:
+                return handle_set_volume(arguments)
+
+            elif name == "get_volume" and ADVANCED_HANDLERS_AVAILABLE:
+                return handle_get_volume(arguments)
+
+            elif name == "system_action" and ADVANCED_HANDLERS_AVAILABLE:
+                return handle_system_action(arguments)
+
+            elif name == "batch_operations" and ADVANCED_HANDLERS_AVAILABLE:
+                return handle_batch_operations(arguments)
 
             else:
                 raise ValueError(f"Unknown tool: {name}")
