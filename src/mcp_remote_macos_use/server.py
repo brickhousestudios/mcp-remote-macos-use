@@ -57,7 +57,7 @@ except ImportError as e:
     SEMANTIC_HANDLERS_AVAILABLE = False
     logger.warning(f"Semantic handlers not available: {e}")
 
-# Import advanced handlers (AppleScript, clipboard, system, batch)
+# Import advanced handlers (AppleScript, clipboard, system, batch, element extraction)
 try:
     from advanced_handlers import (
         handle_execute_applescript,
@@ -67,10 +67,16 @@ try:
         handle_set_volume,
         handle_get_volume,
         handle_system_action,
-        handle_batch_operations
+        handle_batch_operations,
+        handle_extract_screen_structure,
+        handle_extract_all_elements,
+        handle_get_bounding_boxes,
+        handle_extract_form_fields,
+        handle_extract_clickable_elements,
+        handle_extract_text_content
     )
     ADVANCED_HANDLERS_AVAILABLE = True
-    logger.info("Advanced handlers (AppleScript, clipboard, system) loaded successfully")
+    logger.info("Advanced handlers (AppleScript, clipboard, system, extraction) loaded successfully")
 except ImportError as e:
     ADVANCED_HANDLERS_AVAILABLE = False
     logger.warning(f"Advanced handlers not available: {e}")
@@ -452,6 +458,72 @@ async def main():
                     "required": ["operations"]
                 },
             ),
+            # Element extraction tools (screen scraping, bounding boxes)
+            types.Tool(
+                name="extract_screen_structure",
+                description="Extract complete UI tree/structure from screen as JSON. Includes element hierarchy, properties, positions. Perfect for screen scraping and understanding UI layout. Requires macOS with Accessibility permissions.",
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "app_name": {"type": "string", "description": "Optional: limit to specific application"},
+                        "include_all_properties": {"type": "boolean", "description": "Include all element properties (default: false)", "default": False},
+                        "format": {"type": "string", "description": "Output format: 'json' or 'summary' (default: 'json')", "enum": ["json", "summary"], "default": "json"}
+                    }
+                },
+            ),
+            types.Tool(
+                name="extract_all_elements",
+                description="Extract all UI elements as a flat list (not nested tree). Useful for finding all elements of certain types. Requires macOS with Accessibility permissions.",
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "app_name": {"type": "string", "description": "Optional: limit to specific application"},
+                        "role_filter": {"type": "array", "description": "Optional: only include these roles (e.g., ['AXButton', 'AXTextField'])", "items": {"type": "string"}},
+                        "max_depth": {"type": "integer", "description": "Maximum depth to traverse (default: 10)", "default": 10}
+                    }
+                },
+            ),
+            types.Tool(
+                name="get_bounding_boxes",
+                description="Get bounding boxes (x, y, width, height) for all UI elements. Perfect for visual element detection and positioning. Requires macOS with Accessibility permissions.",
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "app_name": {"type": "string", "description": "Optional: limit to specific application"},
+                        "role_filter": {"type": "array", "description": "Optional: only include these roles", "items": {"type": "string"}}
+                    }
+                },
+            ),
+            types.Tool(
+                name="extract_form_fields",
+                description="Extract all form fields (text fields, checkboxes, radio buttons, etc.). Perfect for automated form filling. Requires macOS with Accessibility permissions.",
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "app_name": {"type": "string", "description": "Optional: limit to specific application"}
+                    }
+                },
+            ),
+            types.Tool(
+                name="extract_clickable_elements",
+                description="Extract all clickable elements (buttons, links, menu items). Find all interactive elements on screen. Requires macOS with Accessibility permissions.",
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "app_name": {"type": "string", "description": "Optional: limit to specific application"}
+                    }
+                },
+            ),
+            types.Tool(
+                name="extract_text_content",
+                description="Extract all visible text content from screen. Perfect for screen reading and text extraction. Requires macOS with Accessibility permissions.",
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "app_name": {"type": "string", "description": "Optional: limit to specific application"}
+                    }
+                },
+            ),
         ] if ADVANCED_HANDLERS_AVAILABLE else [])
 
     @server.call_tool()
@@ -530,6 +602,25 @@ async def main():
 
             elif name == "batch_operations" and ADVANCED_HANDLERS_AVAILABLE:
                 return handle_batch_operations(arguments)
+
+            # Element extraction tools
+            elif name == "extract_screen_structure" and ADVANCED_HANDLERS_AVAILABLE:
+                return handle_extract_screen_structure(arguments)
+
+            elif name == "extract_all_elements" and ADVANCED_HANDLERS_AVAILABLE:
+                return handle_extract_all_elements(arguments)
+
+            elif name == "get_bounding_boxes" and ADVANCED_HANDLERS_AVAILABLE:
+                return handle_get_bounding_boxes(arguments)
+
+            elif name == "extract_form_fields" and ADVANCED_HANDLERS_AVAILABLE:
+                return handle_extract_form_fields(arguments)
+
+            elif name == "extract_clickable_elements" and ADVANCED_HANDLERS_AVAILABLE:
+                return handle_extract_clickable_elements(arguments)
+
+            elif name == "extract_text_content" and ADVANCED_HANDLERS_AVAILABLE:
+                return handle_extract_text_content(arguments)
 
             else:
                 raise ValueError(f"Unknown tool: {name}")

@@ -26,6 +26,13 @@ try:
 except ImportError:
     SYSTEM_CONTROLS_AVAILABLE = False
 
+# Import element extraction
+try:
+    from element_extractor import ElementExtractor
+    ELEMENT_EXTRACTION_AVAILABLE = True
+except ImportError:
+    ELEMENT_EXTRACTION_AVAILABLE = False
+
 # Import for batch operations
 from action_handlers import (
     handle_remote_macos_mouse_click,
@@ -398,3 +405,305 @@ def handle_batch_operations(arguments: dict[str, Any]) -> list[types.TextContent
     summary += "Results:\n" + "\n".join(results)
 
     return [types.TextContent(type="text", text=summary)]
+
+
+# Element Extraction Handlers
+
+def handle_extract_screen_structure(arguments: dict[str, Any]) -> list[types.TextContent]:
+    """
+    Extract complete UI structure/tree from screen.
+
+    Args:
+        arguments: Dict with:
+            - app_name: Optional app name to limit extraction
+            - include_all_properties: Include all properties (default: False)
+            - format: Output format "json" or "summary" (default: "json")
+
+    Returns:
+        Screen structure
+    """
+    if not ELEMENT_EXTRACTION_AVAILABLE:
+        return [types.TextContent(
+            type="text",
+            text="Element extraction not available. Requires macOS with Accessibility API."
+        )]
+
+    app_name = arguments.get("app_name")
+    include_all = arguments.get("include_all_properties", False)
+    output_format = arguments.get("format", "json")
+
+    try:
+        extractor = ElementExtractor()
+        structure = extractor.extract_screen_structure(app_name, include_all)
+
+        if output_format == "json":
+            return [types.TextContent(
+                type="text",
+                text=json.dumps(structure, indent=2)
+            )]
+        else:
+            # Summary format
+            def count_elements(node, count=0):
+                count += 1
+                if "children" in node:
+                    for child in node["children"]:
+                        count = count_elements(child, count)
+                return count
+
+            total = count_elements(structure.get("element_tree", {}))
+            summary = f"Screen Structure for {app_name or 'all apps'}:\n"
+            summary += f"Total elements: {total}\n"
+            summary += f"Include all properties: {include_all}\n\n"
+            summary += f"JSON output:\n{json.dumps(structure, indent=2)[:1000]}..."
+
+            return [types.TextContent(type="text", text=summary)]
+
+    except Exception as e:
+        logger.error(f"Error extracting screen structure: {e}", exc_info=True)
+        return [types.TextContent(type="text", text=f"Error: {str(e)}")]
+
+
+def handle_extract_all_elements(arguments: dict[str, Any]) -> list[types.TextContent]:
+    """
+    Extract all UI elements as a flat list.
+
+    Args:
+        arguments: Dict with:
+            - app_name: Optional app name
+            - role_filter: Optional list of roles to include
+            - max_depth: Maximum depth to traverse (default: 10)
+
+    Returns:
+        List of all elements
+    """
+    if not ELEMENT_EXTRACTION_AVAILABLE:
+        return [types.TextContent(
+            type="text",
+            text="Element extraction not available. Requires macOS with Accessibility API."
+        )]
+
+    app_name = arguments.get("app_name")
+    role_filter = arguments.get("role_filter")
+    max_depth = arguments.get("max_depth", 10)
+
+    try:
+        extractor = ElementExtractor()
+
+        # Get app PID if specified
+        pid = None
+        if app_name:
+            from Cocoa import NSWorkspace
+            workspace = NSWorkspace.sharedWorkspace()
+            running_apps = workspace.runningApplications()
+
+            for app in running_apps:
+                if app.localizedName().lower() == app_name.lower():
+                    pid = app.processIdentifier()
+                    break
+
+            if not pid:
+                return [types.TextContent(type="text", text=f"App not found: {app_name}")]
+
+        from ApplicationServices import AXUIElementCreateApplication, AXUIElementCreateSystemWide
+        root = AXUIElementCreateApplication(pid) if pid else AXUIElementCreateSystemWide()
+
+        elements = extractor.extract_all_elements_flat(root, max_depth, role_filter)
+
+        return [types.TextContent(
+            type="text",
+            text=f"Found {len(elements)} elements\n\n{json.dumps(elements[:50], indent=2)}"
+        )]
+
+    except Exception as e:
+        logger.error(f"Error extracting elements: {e}", exc_info=True)
+        return [types.TextContent(type="text", text=f"Error: {str(e)}")]
+
+
+def handle_get_bounding_boxes(arguments: dict[str, Any]) -> list[types.TextContent]:
+    """
+    Get bounding boxes for all UI elements.
+
+    Args:
+        arguments: Dict with:
+            - app_name: Optional app name
+            - role_filter: Optional list of roles
+
+    Returns:
+        List of elements with bounding boxes
+    """
+    if not ELEMENT_EXTRACTION_AVAILABLE:
+        return [types.TextContent(
+            type="text",
+            text="Element extraction not available. Requires macOS with Accessibility API."
+        )]
+
+    app_name = arguments.get("app_name")
+    role_filter = arguments.get("role_filter")
+
+    try:
+        extractor = ElementExtractor()
+
+        # Get app PID
+        pid = None
+        if app_name:
+            from Cocoa import NSWorkspace
+            workspace = NSWorkspace.sharedWorkspace()
+            running_apps = workspace.runningApplications()
+
+            for app in running_apps:
+                if app.localizedName().lower() == app_name.lower():
+                    pid = app.processIdentifier()
+                    break
+
+        boxes = extractor.get_bounding_boxes(pid, role_filter)
+
+        return [types.TextContent(
+            type="text",
+            text=f"Found {len(boxes)} elements with bounding boxes\n\n{json.dumps(boxes, indent=2)}"
+        )]
+
+    except Exception as e:
+        logger.error(f"Error getting bounding boxes: {e}", exc_info=True)
+        return [types.TextContent(type="text", text=f"Error: {str(e)}")]
+
+
+def handle_extract_form_fields(arguments: dict[str, Any]) -> list[types.TextContent]:
+    """
+    Extract all form fields from screen.
+
+    Args:
+        arguments: Dict with:
+            - app_name: Optional app name
+
+    Returns:
+        List of form fields
+    """
+    if not ELEMENT_EXTRACTION_AVAILABLE:
+        return [types.TextContent(
+            type="text",
+            text="Element extraction not available. Requires macOS with Accessibility API."
+        )]
+
+    app_name = arguments.get("app_name")
+
+    try:
+        extractor = ElementExtractor()
+
+        pid = None
+        if app_name:
+            from Cocoa import NSWorkspace
+            workspace = NSWorkspace.sharedWorkspace()
+            running_apps = workspace.runningApplications()
+
+            for app in running_apps:
+                if app.localizedName().lower() == app_name.lower():
+                    pid = app.processIdentifier()
+                    break
+
+        fields = extractor.extract_form_fields(pid)
+
+        return [types.TextContent(
+            type="text",
+            text=f"Found {len(fields)} form fields\n\n{json.dumps(fields, indent=2)}"
+        )]
+
+    except Exception as e:
+        logger.error(f"Error extracting form fields: {e}", exc_info=True)
+        return [types.TextContent(type="text", text=f"Error: {str(e)}")]
+
+
+def handle_extract_clickable_elements(arguments: dict[str, Any]) -> list[types.TextContent]:
+    """
+    Extract all clickable elements (buttons, links, etc.).
+
+    Args:
+        arguments: Dict with:
+            - app_name: Optional app name
+
+    Returns:
+        List of clickable elements
+    """
+    if not ELEMENT_EXTRACTION_AVAILABLE:
+        return [types.TextContent(
+            type="text",
+            text="Element extraction not available. Requires macOS with Accessibility API."
+        )]
+
+    app_name = arguments.get("app_name")
+
+    try:
+        extractor = ElementExtractor()
+
+        pid = None
+        if app_name:
+            from Cocoa import NSWorkspace
+            workspace = NSWorkspace.sharedWorkspace()
+            running_apps = workspace.runningApplications()
+
+            for app in running_apps:
+                if app.localizedName().lower() == app_name.lower():
+                    pid = app.processIdentifier()
+                    break
+
+        elements = extractor.extract_clickable_elements(pid)
+
+        return [types.TextContent(
+            type="text",
+            text=f"Found {len(elements)} clickable elements\n\n{json.dumps(elements, indent=2)}"
+        )]
+
+    except Exception as e:
+        logger.error(f"Error extracting clickable elements: {e}", exc_info=True)
+        return [types.TextContent(type="text", text=f"Error: {str(e)}")]
+
+
+def handle_extract_text_content(arguments: dict[str, Any]) -> list[types.TextContent]:
+    """
+    Extract all text content from screen.
+
+    Args:
+        arguments: Dict with:
+            - app_name: Optional app name
+
+    Returns:
+        All text content
+    """
+    if not ELEMENT_EXTRACTION_AVAILABLE:
+        return [types.TextContent(
+            type="text",
+            text="Element extraction not available. Requires macOS with Accessibility API."
+        )]
+
+    app_name = arguments.get("app_name")
+
+    try:
+        extractor = ElementExtractor()
+
+        pid = None
+        if app_name:
+            from Cocoa import NSWorkspace
+            workspace = NSWorkspace.sharedWorkspace()
+            running_apps = workspace.runningApplications()
+
+            for app in running_apps:
+                if app.localizedName().lower() == app_name.lower():
+                    pid = app.processIdentifier()
+                    break
+
+        text_elements = extractor.extract_text_elements(pid)
+
+        # Compile all text
+        all_text = []
+        for elem in text_elements:
+            text = elem.get("AXValue") or elem.get("AXTitle") or ""
+            if text:
+                all_text.append(text)
+
+        return [types.TextContent(
+            type="text",
+            text=f"Extracted {len(all_text)} text elements:\n\n" + "\n".join(all_text)
+        )]
+
+    except Exception as e:
+        logger.error(f"Error extracting text content: {e}", exc_info=True)
+        return [types.TextContent(type="text", text=f"Error: {str(e)}")]
