@@ -6,6 +6,21 @@
 [![Docker Pulls](https://img.shields.io/docker/pulls/buryhuang/mcp-remote-macos-use)](https://hub.docker.com/r/buryhuang/mcp-remote-macos-use)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
+## 🚀 Quick Start
+
+**New to MCP?** Get started in 2 minutes:
+
+```bash
+# 1. Run the automated setup
+bash setup_mcp.sh
+
+# 2. Restart Claude Desktop
+
+# 3. Test it: "Take a screenshot of my Mac screen"
+```
+
+📚 **[Full Setup Guide](MCP_SETUP.md)** | 🎯 **42 Available Tools** | 🔧 **[Troubleshooting](MCP_SETUP.md#troubleshooting)**
+
 **Showcases**
 - Research Twitter and Post Twitter(https://www.youtube.com/watch?v=--QHz2jcvcs)
 <img width="400" alt="image" src="https://github.com/user-attachments/assets/bfe6e354-3d59-4d08-855b-2eecdaaeb46f" />
