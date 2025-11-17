@@ -47,6 +47,20 @@ try:
 except ImportError:
     VISUAL_DEBUGGING_AVAILABLE = False
 
+# Import window manager
+try:
+    from window_manager import WindowManager, check_window_manager_available
+    WINDOW_MANAGER_AVAILABLE = check_window_manager_available()
+except ImportError:
+    WINDOW_MANAGER_AVAILABLE = False
+
+# Import advanced interactions
+try:
+    from advanced_interactions import AdvancedInteractions, GestureType, check_advanced_interactions_available
+    ADVANCED_INTERACTIONS_AVAILABLE = check_advanced_interactions_available()
+except ImportError:
+    ADVANCED_INTERACTIONS_AVAILABLE = False
+
 # Import for batch operations
 from action_handlers import (
     handle_remote_macos_mouse_click,
@@ -1014,4 +1028,487 @@ def handle_visualize_element_tree(arguments: dict[str, Any]) -> list[types.TextC
 
     except Exception as e:
         logger.error(f"Error visualizing element tree: {e}", exc_info=True)
+        return [types.TextContent(type="text", text=f"Error: {str(e)}")]
+
+
+# Window Management Handlers
+
+def handle_list_windows(arguments: dict[str, Any]) -> list[types.TextContent]:
+    """
+    List all windows or windows for specific app.
+
+    Args:
+        arguments: Dict with:
+            - app_name: Optional app name to filter
+
+    Returns:
+        List of windows with details
+    """
+    if not WINDOW_MANAGER_AVAILABLE:
+        return [types.TextContent(
+            type="text",
+            text="Window management not available. Requires macOS with Accessibility permissions."
+        )]
+
+    app_name = arguments.get("app_name")
+
+    try:
+        manager = WindowManager()
+        windows = manager.list_all_windows(app_name)
+
+        if not windows:
+            return [types.TextContent(
+                type="text",
+                text=f"No windows found" + (f" for app: {app_name}" if app_name else "")
+            )]
+
+        # Format window list
+        window_list = []
+        for w in windows:
+            window_list.append(
+                f"• {w.get('app_name', 'Unknown')} - {w.get('title', 'Untitled')}\n"
+                f"  Position: ({w.get('x', 0)}, {w.get('y', 0)})\n"
+                f"  Size: {w.get('width', 0)}x{w.get('height', 0)}\n"
+                f"  Minimized: {w.get('minimized', False)}"
+            )
+
+        return [types.TextContent(
+            type="text",
+            text=f"Found {len(windows)} window(s):\n\n" + "\n\n".join(window_list)
+        )]
+
+    except Exception as e:
+        logger.error(f"Error listing windows: {e}", exc_info=True)
+        return [types.TextContent(type="text", text=f"Error: {str(e)}")]
+
+
+def handle_resize_window(arguments: dict[str, Any]) -> list[types.TextContent]:
+    """
+    Resize a window.
+
+    Args:
+        arguments: Dict with:
+            - window_title: Window title (required)
+            - width: New width in pixels (required)
+            - height: New height in pixels (required)
+            - app_name: Optional app name filter
+
+    Returns:
+        Success/failure message
+    """
+    if not WINDOW_MANAGER_AVAILABLE:
+        return [types.TextContent(
+            type="text",
+            text="Window management not available. Requires macOS with Accessibility permissions."
+        )]
+
+    window_title = arguments.get("window_title")
+    width = arguments.get("width")
+    height = arguments.get("height")
+    app_name = arguments.get("app_name")
+
+    if not window_title:
+        raise ValueError("window_title is required")
+    if width is None or height is None:
+        raise ValueError("width and height are required")
+
+    try:
+        manager = WindowManager()
+        window, pid, error = manager.get_window_by_title(window_title, app_name)
+
+        if not window:
+            return [types.TextContent(type="text", text=f"✗ {error}")]
+
+        success, error = manager.resize_window(window, width, height)
+
+        if success:
+            return [types.TextContent(
+                type="text",
+                text=f"✓ Resized window '{window_title}' to {width}x{height}"
+            )]
+        else:
+            return [types.TextContent(type="text", text=f"✗ {error}")]
+
+    except Exception as e:
+        logger.error(f"Error resizing window: {e}", exc_info=True)
+        return [types.TextContent(type="text", text=f"Error: {str(e)}")]
+
+
+def handle_move_window(arguments: dict[str, Any]) -> list[types.TextContent]:
+    """
+    Move a window to new position.
+
+    Args:
+        arguments: Dict with:
+            - window_title: Window title (required)
+            - x: New x coordinate (required)
+            - y: New y coordinate (required)
+            - app_name: Optional app name filter
+
+    Returns:
+        Success/failure message
+    """
+    if not WINDOW_MANAGER_AVAILABLE:
+        return [types.TextContent(
+            type="text",
+            text="Window management not available. Requires macOS with Accessibility permissions."
+        )]
+
+    window_title = arguments.get("window_title")
+    x = arguments.get("x")
+    y = arguments.get("y")
+    app_name = arguments.get("app_name")
+
+    if not window_title:
+        raise ValueError("window_title is required")
+    if x is None or y is None:
+        raise ValueError("x and y coordinates are required")
+
+    try:
+        manager = WindowManager()
+        window, pid, error = manager.get_window_by_title(window_title, app_name)
+
+        if not window:
+            return [types.TextContent(type="text", text=f"✗ {error}")]
+
+        success, error = manager.move_window(window, x, y)
+
+        if success:
+            return [types.TextContent(
+                type="text",
+                text=f"✓ Moved window '{window_title}' to ({x}, {y})"
+            )]
+        else:
+            return [types.TextContent(type="text", text=f"✗ {error}")]
+
+    except Exception as e:
+        logger.error(f"Error moving window: {e}", exc_info=True)
+        return [types.TextContent(type="text", text=f"Error: {str(e)}")]
+
+
+def handle_window_action(arguments: dict[str, Any]) -> list[types.TextContent]:
+    """
+    Perform action on window (minimize, maximize, fullscreen, close).
+
+    Args:
+        arguments: Dict with:
+            - window_title: Window title (required)
+            - action: Action to perform (required) - "minimize", "maximize", "fullscreen", "close", "restore"
+            - app_name: Optional app name filter
+
+    Returns:
+        Success/failure message
+    """
+    if not WINDOW_MANAGER_AVAILABLE:
+        return [types.TextContent(
+            type="text",
+            text="Window management not available. Requires macOS with Accessibility permissions."
+        )]
+
+    window_title = arguments.get("window_title")
+    action = arguments.get("action")
+    app_name = arguments.get("app_name")
+
+    if not window_title:
+        raise ValueError("window_title is required")
+    if not action:
+        raise ValueError("action is required")
+
+    try:
+        manager = WindowManager()
+        window, pid, error = manager.get_window_by_title(window_title, app_name)
+
+        if not window:
+            return [types.TextContent(type="text", text=f"✗ {error}")]
+
+        # Perform action
+        if action == "minimize":
+            success, error = manager.minimize_window(window)
+        elif action == "maximize":
+            success, error = manager.maximize_window(window)
+        elif action == "fullscreen":
+            success, error = manager.fullscreen_window(window)
+        elif action == "close":
+            success, error = manager.close_window(window)
+        elif action == "restore":
+            success, error = manager.restore_window(window)
+        else:
+            return [types.TextContent(
+                type="text",
+                text=f"✗ Unknown action: {action}. Use: minimize, maximize, fullscreen, close, restore"
+            )]
+
+        if success:
+            return [types.TextContent(
+                type="text",
+                text=f"✓ Performed '{action}' on window '{window_title}'"
+            )]
+        else:
+            return [types.TextContent(type="text", text=f"✗ {error}")]
+
+    except Exception as e:
+        logger.error(f"Error performing window action: {e}", exc_info=True)
+        return [types.TextContent(type="text", text=f"Error: {str(e)}")]
+
+
+def handle_switch_to_window(arguments: dict[str, Any]) -> list[types.TextContent]:
+    """
+    Switch to a specific window.
+
+    Args:
+        arguments: Dict with:
+            - app_name: Application name (required)
+            - window_title: Optional window title to switch to specific window
+
+    Returns:
+        Success/failure message
+    """
+    if not WINDOW_MANAGER_AVAILABLE:
+        return [types.TextContent(
+            type="text",
+            text="Window management not available. Requires macOS with Accessibility permissions."
+        )]
+
+    app_name = arguments.get("app_name")
+    window_title = arguments.get("window_title")
+
+    if not app_name:
+        raise ValueError("app_name is required")
+
+    try:
+        manager = WindowManager()
+        success, error = manager.switch_to_window(app_name, window_title)
+
+        if success:
+            msg = f"✓ Switched to {app_name}"
+            if window_title:
+                msg += f" - '{window_title}'"
+            return [types.TextContent(type="text", text=msg)]
+        else:
+            return [types.TextContent(type="text", text=f"✗ {error}")]
+
+    except Exception as e:
+        logger.error(f"Error switching to window: {e}", exc_info=True)
+        return [types.TextContent(type="text", text=f"Error: {str(e)}")]
+
+
+# Advanced Interaction Handlers
+
+def handle_right_click(arguments: dict[str, Any]) -> list[types.TextContent]:
+    """
+    Perform right-click at coordinates.
+
+    Args:
+        arguments: Dict with:
+            - x: X coordinate (required)
+            - y: Y coordinate (required)
+            - menu_item: Optional menu item to click after right-click
+
+    Returns:
+        Success/failure message
+    """
+    if not ADVANCED_INTERACTIONS_AVAILABLE:
+        return [types.TextContent(
+            type="text",
+            text="Advanced interactions not available. Requires macOS with Quartz framework."
+        )]
+
+    x = arguments.get("x")
+    y = arguments.get("y")
+    menu_item = arguments.get("menu_item")
+
+    if x is None or y is None:
+        raise ValueError("x and y coordinates are required")
+
+    try:
+        interactions = AdvancedInteractions()
+
+        if menu_item:
+            success, error = interactions.context_menu_click(x, y, menu_item)
+            if success:
+                return [types.TextContent(
+                    type="text",
+                    text=f"✓ Right-clicked at ({x}, {y}) and selected '{menu_item}'"
+                )]
+        else:
+            success, error = interactions.right_click(x, y)
+            if success:
+                return [types.TextContent(
+                    type="text",
+                    text=f"✓ Right-clicked at ({x}, {y})"
+                )]
+
+        return [types.TextContent(type="text", text=f"✗ {error}")]
+
+    except Exception as e:
+        logger.error(f"Error performing right-click: {e}", exc_info=True)
+        return [types.TextContent(type="text", text=f"Error: {str(e)}")]
+
+
+def handle_select_text(arguments: dict[str, Any]) -> list[types.TextContent]:
+    """
+    Select text by dragging or using select all.
+
+    Args:
+        arguments: Dict with:
+            - start_x: Optional start X coordinate for drag selection
+            - start_y: Optional start Y coordinate for drag selection
+            - end_x: Optional end X coordinate for drag selection
+            - end_y: Optional end Y coordinate for drag selection
+            - select_all: Optional boolean to select all text (Cmd+A)
+
+    Returns:
+        Success/failure message
+    """
+    if not ADVANCED_INTERACTIONS_AVAILABLE:
+        return [types.TextContent(
+            type="text",
+            text="Advanced interactions not available. Requires macOS with Quartz framework."
+        )]
+
+    start_x = arguments.get("start_x")
+    start_y = arguments.get("start_y")
+    end_x = arguments.get("end_x")
+    end_y = arguments.get("end_y")
+    select_all = arguments.get("select_all", False)
+
+    try:
+        interactions = AdvancedInteractions()
+
+        if select_all:
+            success, error = interactions.select_all_text()
+            if success:
+                return [types.TextContent(
+                    type="text",
+                    text="✓ Selected all text (Cmd+A)"
+                )]
+        elif start_x is not None and start_y is not None and end_x is not None and end_y is not None:
+            success, error = interactions.select_text(start_x, start_y, end_x, end_y)
+            if success:
+                return [types.TextContent(
+                    type="text",
+                    text=f"✓ Selected text from ({start_x}, {start_y}) to ({end_x}, {end_y})"
+                )]
+        else:
+            return [types.TextContent(
+                type="text",
+                text="✗ Either provide coordinates (start_x, start_y, end_x, end_y) or set select_all=true"
+            )]
+
+        return [types.TextContent(type="text", text=f"✗ {error}")]
+
+    except Exception as e:
+        logger.error(f"Error selecting text: {e}", exc_info=True)
+        return [types.TextContent(type="text", text=f"Error: {str(e)}")]
+
+
+def handle_copy_cut_selection(arguments: dict[str, Any]) -> list[types.TextContent]:
+    """
+    Copy or cut selected text to clipboard.
+
+    Args:
+        arguments: Dict with:
+            - action: "copy" or "cut" (required)
+
+    Returns:
+        Success/failure message and clipboard content
+    """
+    if not ADVANCED_INTERACTIONS_AVAILABLE:
+        return [types.TextContent(
+            type="text",
+            text="Advanced interactions not available. Requires macOS with Quartz framework."
+        )]
+
+    action = arguments.get("action", "copy")
+
+    try:
+        interactions = AdvancedInteractions()
+
+        if action == "copy":
+            success, error = interactions.copy_selection()
+        elif action == "cut":
+            success, error = interactions.cut_selection()
+        else:
+            return [types.TextContent(
+                type="text",
+                text=f"✗ Unknown action: {action}. Use 'copy' or 'cut'"
+            )]
+
+        if success:
+            # Get clipboard content to confirm
+            try:
+                from system_controls import ClipboardManager
+                clipboard = ClipboardManager()
+                content = clipboard.read_text()
+                return [types.TextContent(
+                    type="text",
+                    text=f"✓ {action.capitalize()}d to clipboard\n\nClipboard content:\n{content[:500]}" +
+                         ("..." if len(content) > 500 else "")
+                )]
+            except:
+                return [types.TextContent(
+                    type="text",
+                    text=f"✓ {action.capitalize()}d to clipboard"
+                )]
+        else:
+            return [types.TextContent(type="text", text=f"✗ {error}")]
+
+    except Exception as e:
+        logger.error(f"Error copying/cutting: {e}", exc_info=True)
+        return [types.TextContent(type="text", text=f"Error: {str(e)}")]
+
+
+def handle_gesture(arguments: dict[str, Any]) -> list[types.TextContent]:
+    """
+    Simulate multi-finger gesture.
+
+    Args:
+        arguments: Dict with:
+            - gesture_type: Gesture type (required) - "pinch_in", "pinch_out", "swipe_left", "swipe_right", "swipe_up", "swipe_down"
+            - center_x: Center X coordinate (required)
+            - center_y: Center Y coordinate (required)
+            - magnitude: Optional gesture magnitude in pixels (default: 100)
+
+    Returns:
+        Success/failure message
+    """
+    if not ADVANCED_INTERACTIONS_AVAILABLE:
+        return [types.TextContent(
+            type="text",
+            text="Advanced interactions not available. Requires macOS with Quartz framework."
+        )]
+
+    gesture_type_str = arguments.get("gesture_type")
+    center_x = arguments.get("center_x")
+    center_y = arguments.get("center_y")
+    magnitude = arguments.get("magnitude", 100.0)
+
+    if not gesture_type_str:
+        raise ValueError("gesture_type is required")
+    if center_x is None or center_y is None:
+        raise ValueError("center_x and center_y are required")
+
+    try:
+        # Parse gesture type
+        gesture_type = GestureType(gesture_type_str)
+
+        interactions = AdvancedInteractions()
+        success, error = interactions.simulate_gesture(gesture_type, center_x, center_y, magnitude)
+
+        if success:
+            return [types.TextContent(
+                type="text",
+                text=f"✓ Simulated {gesture_type_str} gesture at ({center_x}, {center_y})"
+            )]
+        else:
+            return [types.TextContent(type="text", text=f"✗ {error}")]
+
+    except ValueError:
+        return [types.TextContent(
+            type="text",
+            text=f"✗ Invalid gesture_type: {gesture_type_str}\n" +
+                 "Valid types: pinch_in, pinch_out, swipe_left, swipe_right, swipe_up, swipe_down"
+        )]
+    except Exception as e:
+        logger.error(f"Error simulating gesture: {e}", exc_info=True)
         return [types.TextContent(type="text", text=f"Error: {str(e)}")]

@@ -57,7 +57,7 @@ except ImportError as e:
     SEMANTIC_HANDLERS_AVAILABLE = False
     logger.warning(f"Semantic handlers not available: {e}")
 
-# Import advanced handlers (AppleScript, clipboard, system, batch, element extraction, smart waiting, visual debugging)
+# Import advanced handlers (AppleScript, clipboard, system, batch, element extraction, smart waiting, visual debugging, window management, advanced interactions)
 try:
     from advanced_handlers import (
         handle_execute_applescript,
@@ -78,10 +78,19 @@ try:
         handle_wait_for_element_property,
         handle_capture_annotated_screenshot,
         handle_highlight_element,
-        handle_visualize_element_tree
+        handle_visualize_element_tree,
+        handle_list_windows,
+        handle_resize_window,
+        handle_move_window,
+        handle_window_action,
+        handle_switch_to_window,
+        handle_right_click,
+        handle_select_text,
+        handle_copy_cut_selection,
+        handle_gesture
     )
     ADVANCED_HANDLERS_AVAILABLE = True
-    logger.info("Advanced handlers (AppleScript, clipboard, system, extraction, smart waiting, visual debugging) loaded successfully")
+    logger.info("Advanced handlers (AppleScript, clipboard, system, extraction, smart waiting, visual debugging, window management, advanced interactions) loaded successfully")
 except ImportError as e:
     ADVANCED_HANDLERS_AVAILABLE = False
     logger.warning(f"Advanced handlers not available: {e}")
@@ -600,6 +609,120 @@ async def main():
                     }
                 },
             ),
+            types.Tool(
+                name="list_windows",
+                description="List all windows or windows for specific application. Shows window title, position, size, and minimized state. Perfect for discovering available windows. Requires macOS with Accessibility permissions.",
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "app_name": {"type": "string", "description": "Optional: filter by application name"}
+                    }
+                },
+            ),
+            types.Tool(
+                name="resize_window",
+                description="Resize a window by title. Change window dimensions programmatically. Requires macOS with Accessibility permissions.",
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "window_title": {"type": "string", "description": "REQUIRED: window title"},
+                        "width": {"type": "integer", "description": "REQUIRED: new width in pixels"},
+                        "height": {"type": "integer", "description": "REQUIRED: new height in pixels"},
+                        "app_name": {"type": "string", "description": "Optional: application name filter"}
+                    },
+                    "required": ["window_title", "width", "height"]
+                },
+            ),
+            types.Tool(
+                name="move_window",
+                description="Move a window to new position. Change window location programmatically. Requires macOS with Accessibility permissions.",
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "window_title": {"type": "string", "description": "REQUIRED: window title"},
+                        "x": {"type": "integer", "description": "REQUIRED: new x coordinate"},
+                        "y": {"type": "integer", "description": "REQUIRED: new y coordinate"},
+                        "app_name": {"type": "string", "description": "Optional: application name filter"}
+                    },
+                    "required": ["window_title", "x", "y"]
+                },
+            ),
+            types.Tool(
+                name="window_action",
+                description="Perform action on window (minimize, maximize, fullscreen, close, restore). Control window state programmatically. Requires macOS with Accessibility permissions.",
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "window_title": {"type": "string", "description": "REQUIRED: window title"},
+                        "action": {"type": "string", "enum": ["minimize", "maximize", "fullscreen", "close", "restore"], "description": "REQUIRED: action to perform"},
+                        "app_name": {"type": "string", "description": "Optional: application name filter"}
+                    },
+                    "required": ["window_title", "action"]
+                },
+            ),
+            types.Tool(
+                name="switch_to_window",
+                description="Switch to (activate) a specific window or application. Brings window to front and focuses it. Requires macOS with Accessibility permissions.",
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "app_name": {"type": "string", "description": "REQUIRED: application name"},
+                        "window_title": {"type": "string", "description": "Optional: specific window title to focus"}
+                    },
+                    "required": ["app_name"]
+                },
+            ),
+            types.Tool(
+                name="right_click",
+                description="Perform right-click at coordinates. Opens context menu. Optionally select menu item by name. Requires macOS with Quartz framework.",
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "x": {"type": "integer", "description": "REQUIRED: x coordinate"},
+                        "y": {"type": "integer", "description": "REQUIRED: y coordinate"},
+                        "menu_item": {"type": "string", "description": "Optional: menu item name to click"}
+                    },
+                    "required": ["x", "y"]
+                },
+            ),
+            types.Tool(
+                name="select_text",
+                description="Select text by dragging or using select all (Cmd+A). Perfect for text manipulation. Requires macOS with Quartz framework.",
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "start_x": {"type": "integer", "description": "Start x coordinate for drag selection"},
+                        "start_y": {"type": "integer", "description": "Start y coordinate for drag selection"},
+                        "end_x": {"type": "integer", "description": "End x coordinate for drag selection"},
+                        "end_y": {"type": "integer", "description": "End y coordinate for drag selection"},
+                        "select_all": {"type": "boolean", "description": "Select all text (Cmd+A) instead of dragging"}
+                    }
+                },
+            ),
+            types.Tool(
+                name="copy_cut_selection",
+                description="Copy or cut selected text to clipboard (Cmd+C or Cmd+X). Returns clipboard content for verification. Requires macOS with Quartz framework.",
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "action": {"type": "string", "enum": ["copy", "cut"], "description": "Action: 'copy' or 'cut' (default: 'copy')"}
+                    }
+                },
+            ),
+            types.Tool(
+                name="gesture",
+                description="Simulate multi-finger gestures (pinch, swipe, zoom). Perfect for map/image navigation. Note: Uses scroll events as proxy - limited support. Requires macOS with Quartz framework.",
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "gesture_type": {"type": "string", "enum": ["pinch_in", "pinch_out", "swipe_left", "swipe_right", "swipe_up", "swipe_down"], "description": "REQUIRED: gesture type"},
+                        "center_x": {"type": "integer", "description": "REQUIRED: center x coordinate"},
+                        "center_y": {"type": "integer", "description": "REQUIRED: center y coordinate"},
+                        "magnitude": {"type": "number", "description": "Optional: gesture magnitude in pixels (default: 100)"}
+                    },
+                    "required": ["gesture_type", "center_x", "center_y"]
+                },
+            ),
         ] if ADVANCED_HANDLERS_AVAILABLE else [])
 
     @server.call_tool()
@@ -714,6 +837,35 @@ async def main():
 
             elif name == "visualize_element_tree" and ADVANCED_HANDLERS_AVAILABLE:
                 return handle_visualize_element_tree(arguments)
+
+            # Window management tools
+            elif name == "list_windows" and ADVANCED_HANDLERS_AVAILABLE:
+                return handle_list_windows(arguments)
+
+            elif name == "resize_window" and ADVANCED_HANDLERS_AVAILABLE:
+                return handle_resize_window(arguments)
+
+            elif name == "move_window" and ADVANCED_HANDLERS_AVAILABLE:
+                return handle_move_window(arguments)
+
+            elif name == "window_action" and ADVANCED_HANDLERS_AVAILABLE:
+                return handle_window_action(arguments)
+
+            elif name == "switch_to_window" and ADVANCED_HANDLERS_AVAILABLE:
+                return handle_switch_to_window(arguments)
+
+            # Advanced interaction tools
+            elif name == "right_click" and ADVANCED_HANDLERS_AVAILABLE:
+                return handle_right_click(arguments)
+
+            elif name == "select_text" and ADVANCED_HANDLERS_AVAILABLE:
+                return handle_select_text(arguments)
+
+            elif name == "copy_cut_selection" and ADVANCED_HANDLERS_AVAILABLE:
+                return handle_copy_cut_selection(arguments)
+
+            elif name == "gesture" and ADVANCED_HANDLERS_AVAILABLE:
+                return handle_gesture(arguments)
 
             else:
                 raise ValueError(f"Unknown tool: {name}")
