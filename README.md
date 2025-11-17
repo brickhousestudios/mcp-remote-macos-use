@@ -36,6 +36,25 @@ docker-compose --profile vm up -d
 
 🚢 **[Docker Setup Guide](DOCKER_SETUP.md)** - Complete instructions for running macOS VMs in Docker
 
+## 🖥️ Standalone VNC Viewer App
+
+**NEW!** Beautiful desktop app for VNC viewing - no VNC client needed!
+
+```bash
+cd electron-app
+npm install
+npm start
+```
+
+**Features:**
+- 🎨 Modern, beautiful UI
+- 🚀 Built-in VNC client (noVNC)
+- 📦 Standalone - works without MCP server
+- 🔧 Optional MCP controls
+- 📱 Cross-platform (Linux, Mac, Windows)
+
+📺 **[Electron App Guide](electron-app/README.md)** - Build and use the standalone VNC viewer
+
 **Showcases**
 - Research Twitter and Post Twitter(https://www.youtube.com/watch?v=--QHz2jcvcs)
 <img width="400" alt="image" src="https://github.com/user-attachments/assets/bfe6e354-3d59-4d08-855b-2eecdaaeb46f" />

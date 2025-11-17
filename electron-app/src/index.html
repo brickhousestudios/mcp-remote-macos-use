@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';">
+    <title>MCP macOS Viewer</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- Connection Panel -->
+    <div id="connection-panel" class="panel">
+        <div class="logo">
+            <h1>🖥️ MCP macOS Viewer</h1>
+            <p class="subtitle">All-in-one VNC viewer with macOS control</p>
+        </div>
+
+        <div class="connection-form">
+            <h2>Connect to Mac</h2>
+
+            <div class="form-group">
+                <label for="vnc-host">Host / IP Address</label>
+                <input type="text" id="vnc-host" placeholder="localhost or 192.168.1.100" value="localhost">
+            </div>
+
+            <div class="form-group">
+                <label for="vnc-port">VNC Port</label>
+                <input type="number" id="vnc-port" placeholder="5900" value="5900">
+            </div>
+
+            <div class="form-group">
+                <label for="vnc-password">Password (optional)</label>
+                <input type="password" id="vnc-password" placeholder="VNC Password">
+            </div>
+
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" id="view-only">
+                    View Only Mode
+                </label>
+            </div>
+
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" id="mcp-enabled">
+                    Enable MCP Controls (Advanced)
+                </label>
+            </div>
+
+            <button id="connect-btn" class="btn-primary">Connect</button>
+
+            <div class="quick-presets">
+                <h3>Quick Presets</h3>
+                <button class="preset-btn" data-host="localhost" data-port="5900">Local VM</button>
+                <button class="preset-btn" data-host="192.168.1.100" data-port="5900">Home Mac</button>
+                <button class="preset-btn" data-host="localhost" data-port="5901">Second Display</button>
+            </div>
+        </div>
+
+        <div class="status-message" id="status-message"></div>
+    </div>
+
+    <!-- VNC Viewer -->
+    <div id="vnc-panel" class="panel hidden">
+        <div class="toolbar">
+            <button id="disconnect-btn" class="btn-danger">Disconnect</button>
+            <button id="fullscreen-btn" class="btn">Fullscreen</button>
+            <button id="fit-screen-btn" class="btn">Fit to Screen</button>
+            <button id="send-ctrl-alt-del-btn" class="btn">Ctrl+Alt+Del</button>
+
+            <div class="toolbar-right">
+                <span id="connection-status">Connected to <span id="connected-host"></span></span>
+                <span id="fps-counter">FPS: 0</span>
+            </div>
+        </div>
+
+        <div id="vnc-container">
+            <canvas id="vnc-canvas"></canvas>
+            <div id="vnc-status" class="vnc-status">Connecting...</div>
+        </div>
+
+        <!-- MCP Controls (optional) -->
+        <div id="mcp-controls" class="mcp-controls hidden">
+            <h3>MCP Controls</h3>
+            <div class="control-group">
+                <button class="mcp-btn" data-action="screenshot">📸 Screenshot</button>
+                <button class="mcp-btn" data-action="list-windows">🪟 List Windows</button>
+                <button class="mcp-btn" data-action="extract-elements">🔍 Extract Elements</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- About Modal -->
+    <div id="about-modal" class="modal hidden">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>About MCP macOS Viewer</h2>
+            <p>Version: <span id="app-version">1.0.0</span></p>
+            <p>All-in-one VNC viewer for remote macOS control</p>
+            <p>with optional MCP integration</p>
+            <br>
+            <p><strong>Features:</strong></p>
+            <ul>
+                <li>Built-in VNC client (noVNC)</li>
+                <li>Standalone - no server needed</li>
+                <li>Optional MCP automation controls</li>
+                <li>Cross-platform (Linux, Mac, Windows)</li>
+            </ul>
+            <br>
+            <p>
+                <a href="#" class="link" onclick="require('electron').shell.openExternal('https://github.com/your-repo'); return false;">
+                    GitHub Repository
+                </a>
+            </p>
+        </div>
+    </div>
+
+    <!-- Loading the scripts -->
+    <script src="../node_modules/@novnc/novnc/core/rfb.js"></script>
+    <script src="renderer.js"></script>
+</body>
+</html>
