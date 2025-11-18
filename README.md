@@ -6,6 +6,34 @@
 [![Docker Pulls](https://img.shields.io/docker/pulls/buryhuang/mcp-remote-macos-use)](https://hub.docker.com/r/buryhuang/mcp-remote-macos-use)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
+---
+
+## ⚠️ CRITICAL SECURITY WARNING
+
+**DO NOT USE THIS TOOL FOR PRODUCTION OR SENSITIVE OPERATIONS**
+
+This project uses **Apple VNC Protocol 30** which has significant cryptographic limitations:
+- **512-bit Diffie-Hellman** (vulnerable to modern attacks)
+- **MD5 hashing** (cryptographically broken)
+- **Single DES encryption** (deprecated and weak)
+- **AES-ECB mode** (reveals patterns, not semantically secure)
+
+**This tool is intended for:**
+- ✅ Development and testing environments
+- ✅ Controlled, isolated networks
+- ✅ Non-sensitive automation tasks
+- ✅ Educational purposes
+
+**DO NOT use for:**
+- ❌ Production environments
+- ❌ Sensitive data (financial, healthcare, PII)
+- ❌ Compliance-regulated systems (HIPAA, PCI-DSS, SOC 2)
+- ❌ Untrusted networks or public internet exposure
+
+**📖 Read the full security documentation: [SECURITY.md](SECURITY.md)**
+
+---
+
 **Showcases**
 - Research Twitter and Post Twitter(https://www.youtube.com/watch?v=--QHz2jcvcs)
 <img width="400" alt="image" src="https://github.com/user-attachments/assets/bfe6e354-3d59-4d08-855b-2eecdaaeb46f" />

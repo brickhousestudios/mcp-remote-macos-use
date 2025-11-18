@@ -3,17 +3,19 @@ import logging
 import socket
 import time
 import io
+import threading
 from PIL import Image
 import pyDes
 from typing import Optional, Tuple, List, Dict, Any
 
-# Configure logging
-logging.basicConfig(
-    level=logging.DEBUG,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger('vnc_client')
-logger.setLevel(logging.DEBUG)
+# Import secure logging
+import sys
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+from secure_logging import setup_secure_logging
+
+# Configure secure logging with environment-controlled level
+LOG_LEVEL = os.environ.get('LOG_LEVEL', 'INFO')
+logger = setup_secure_logging('vnc_client', LOG_LEVEL)
 
 
 async def capture_vnc_screen(host: str, port: int, password: str, username: Optional[str] = None,
@@ -166,7 +168,16 @@ class Encoding:
     DESKTOP_SIZE = -223
 
 class VNCClient:
-    """VNC client implementation to connect to remote MacOs machines and capture screenshots."""
+    """VNC client implementation to connect to remote MacOs machines and capture screenshots.
+
+    This class is NOT thread-safe. Each thread should use its own VNCClient instance.
+    Use as a context manager to ensure proper resource cleanup.
+
+    Example:
+        with VNCClient(host, port, password) as vnc:
+            if vnc.connect()[0]:
+                screenshot = vnc.capture_screen()
+    """
 
     def __init__(self, host: str, port: int = 5900, password: Optional[str] = None, username: Optional[str] = None,
                  encryption: str = "prefer_on"):
@@ -191,10 +202,19 @@ class VNCClient:
         self.name = ""
         self.protocol_version = ""
         self._last_frame = None  # Store last frame for incremental updates
-        self._socket_buffer_size = 8192  # Increased buffer size for better performance
-        logger.debug(f"Initialized VNC client for {host}:{port} with encryption={encryption}")
-        if username:
-            logger.debug(f"Username authentication enabled for: {username}")
+        self._frame_lock = threading.Lock()  # Thread safety for _last_frame
+        self._socket_buffer_size = 65536  # Increased buffer size for better performance
+        self._connected = False  # Track connection state
+        logger.debug(f"Initialized VNC client for {host}:{port}")
+
+    def __enter__(self):
+        """Context manager entry."""
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Context manager exit - ensures cleanup."""
+        self.close()
+        return False  # Don't suppress exceptions
 
     def connect(self) -> Tuple[bool, Optional[str]]:
         """Connect to the remote MacOs machine and perform the RFB handshake.
@@ -516,18 +536,27 @@ class VNCClient:
             self._set_encodings([Encoding.RAW, Encoding.COPY_RECT, Encoding.DESKTOP_SIZE])
 
             logger.info("VNC connection fully established and configured")
+            self._connected = True
             return True, None
 
         except Exception as e:
             error_msg = f"Unexpected error during VNC connection: {str(e)}"
             logger.error(error_msg, exc_info=True)
-            if self.socket:
-                try:
-                    self.socket.close()
-                except:
-                    pass
-                self.socket = None
+            self._cleanup_socket()
             return False, error_msg
+
+    def _cleanup_socket(self):
+        """Safely cleanup socket connection."""
+        if self.socket:
+            try:
+                self.socket.close()
+            except socket.error as e:
+                logger.debug(f"Error closing socket: {e}")
+            except Exception as e:
+                logger.error(f"Unexpected error closing socket: {e}")
+            finally:
+                self.socket = None
+                self._connected = False
 
     def _set_pixel_format(self):
         """Set the pixel format to be used for the connection (32-bit true color)."""
@@ -661,18 +690,18 @@ class VNCClient:
     def capture_screen(self) -> Optional[bytes]:
         """Capture a screenshot from the remote MacOs machine with optimizations."""
         try:
-            if not self.socket:
+            if not self.socket or not self._connected:
                 logger.error("Not connected to remote MacOs machine")
                 return None
 
-            # Use incremental updates if we have a previous frame
-            is_incremental = self._last_frame is not None
-
-            # Create or reuse image
-            if is_incremental:
-                img = self._last_frame
-            else:
-                img = Image.new('RGB', (self.width, self.height), color='black')
+            # Use incremental updates if we have a previous frame (thread-safe)
+            with self._frame_lock:
+                is_incremental = self._last_frame is not None
+                # Create or reuse image
+                if is_incremental:
+                    img = self._last_frame.copy()  # Copy to avoid race conditions
+                else:
+                    img = Image.new('RGB', (self.width, self.height), color='black')
 
             # Send FramebufferUpdateRequest message
             msg = bytearray([3])  # message type 3 = FramebufferUpdateRequest
@@ -742,8 +771,9 @@ class VNCClient:
                     logger.warning(f"Unsupported encoding type: {encoding_type}")
                     continue
 
-            # Store the frame for future incremental updates
-            self._last_frame = img
+            # Store the frame for future incremental updates (thread-safe)
+            with self._frame_lock:
+                self._last_frame = img
 
             # Convert image to PNG with optimization
             img_byte_arr = io.BytesIO()
@@ -772,12 +802,9 @@ class VNCClient:
 
     def close(self):
         """Close the connection to the remote MacOs machine."""
-        if self.socket:
-            try:
-                self.socket.close()
-            except:
-                pass
-            self.socket = None
+        self._cleanup_socket()
+        with self._frame_lock:
+            self._last_frame = None  # Clear cached frame
 
     def send_key_event(self, key: int, down: bool) -> bool:
         """Send a key event to the remote MacOs machine.
