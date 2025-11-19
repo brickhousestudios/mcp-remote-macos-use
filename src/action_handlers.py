@@ -55,19 +55,18 @@ async def handle_remote_macos_get_screen(arguments: dict[str, Any]) -> list[type
     )
 
     if not success:
-        return [types.TextContent(type="text", text=error_message)]
+        return [types.TextContent(type="text", text=error_message or "Unknown error occurred")]
 
     # Encode image in base64
-    base64_data = base64.b64encode(screen_data).decode('utf-8')
+    base64_data = base64.b64encode(screen_data or b'').decode('utf-8')
 
     # Return image content with dimensions
-    width, height = dimensions
+    width, height = dimensions or (0, 0)
     return [
         types.ImageContent(
             type="image",
             data=base64_data,
-            mimeType="image/png",
-            alt_text=f"Screenshot from remote MacOs machine at {host}:{port}"
+            mimeType="image/png"
         ),
         types.TextContent(
             type="text",
@@ -579,6 +578,9 @@ def handle_remote_macos_mouse_drag_n_drop(arguments: dict[str, Any]) -> list[typ
     # Validate required parameters
     if any(x is None for x in [start_x, start_y, end_x, end_y]):
         raise ValueError("start_x, start_y, end_x, and end_y coordinates are required")
+
+    # Type assertions after validation
+    assert start_x is not None and start_y is not None and end_x is not None and end_y is not None
 
     # Ensure source dimensions are positive
     if source_width <= 0 or source_height <= 0:

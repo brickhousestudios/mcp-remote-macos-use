@@ -4,7 +4,8 @@ import socket
 import time
 import io
 from PIL import Image
-import pyDes
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from cryptography.hazmat.backends import default_backend
 from typing import Optional, Tuple, List, Dict, Any
 
 # Configure logging
@@ -113,17 +114,20 @@ def encrypt_MACOS_PASSWORD(password: str, challenge: bytes) -> bytes:
                          ((k >> 6) & 1) << 1 |
                          ((k >> 7) & 1) << 0 for k in key])
 
-    # Create a pyDes instance for encryption
-    k = pyDes.des(reversed_key, pyDes.ECB, pad=None)
+    # Create a DES cipher in ECB mode using cryptography
+    # Note: DES uses an 8-byte key
+    from cryptography.hazmat.decrepit.ciphers.algorithms import TripleDES as DES_Algorithm
+
+    # For single DES with 8-byte key, we need to use the legacy TripleDES in single-DES mode
+    # by repeating the 8-byte key three times to create a 24-byte key
+    des_key_24 = reversed_key + reversed_key + reversed_key
+    cipher = Cipher(DES_Algorithm(des_key_24), modes.ECB(), backend=default_backend())
+    encryptor = cipher.encryptor()
 
     # Encrypt the challenge with the key
-    result = bytearray()
-    for i in range(0, len(challenge), 8):
-        block = challenge[i:i+8]
-        cipher_block = k.encrypt(block)
-        result.extend(cipher_block)
+    result = encryptor.update(challenge) + encryptor.finalize()
 
-    return bytes(result)
+    return result
 
 class PixelFormat:
     """VNC pixel format specification."""

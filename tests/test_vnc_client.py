@@ -100,25 +100,21 @@ class TestVNCClient:
         mock_socket.close.assert_called_once()
         assert vnc_client.socket is None
     
-    @patch('pyDes.des')
-    def test_encrypt_password(self, mock_des):
+    def test_encrypt_password(self):
         """Test VNC password encryption."""
         # Arrange
-        mock_encryptor = MagicMock()
-        mock_des.return_value = mock_encryptor
-        # Set a simple return value that's not dependent on input
-        mock_encryptor.encrypt.return_value = b'encrypted_data'
-        challenge = b'challenge'
+        challenge = b'\x00\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x0c\x0d\x0e\x0f'
         password = 'password'
-        
+
         # Act
         result = encrypt_MACOS_PASSWORD(password, challenge)
-        
+
         # Assert
-        assert mock_des.called
-        assert mock_encryptor.encrypt.called
-        # No longer assert the exact result, as the real implementation
-        # is more complex and may process data in blocks
+        # Result should be the same length as the challenge (16 bytes in this case)
+        assert isinstance(result, bytes)
+        assert len(result) == len(challenge)
+        # Result should not be the same as the challenge (it's encrypted)
+        assert result != challenge
     
     def test_pixel_format(self):
         """Test PixelFormat parsing."""

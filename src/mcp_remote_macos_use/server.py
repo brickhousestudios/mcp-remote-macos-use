@@ -7,7 +7,6 @@ import time
 import io
 from PIL import Image
 import asyncio
-import pyDes
 import json
 import os
 from base64 import b64encode
