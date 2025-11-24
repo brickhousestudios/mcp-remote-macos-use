@@ -1,0 +1,70 @@
+{
+  "name": "mcp-macos-viewer",
+  "version": "1.0.0",
+  "description": "All-in-one VNC viewer for macOS control with optional MCP integration",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "build": "electron-builder",
+    "build:linux": "electron-builder --linux",
+    "build:mac": "electron-builder --mac",
+    "build:win": "electron-builder --win",
+    "build:all": "electron-builder -mwl",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder"
+  },
+  "build": {
+    "appId": "com.mcp.macos-viewer",
+    "productName": "MCP macOS Viewer",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "src/**/*",
+      "node_modules/**/*"
+    ],
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb",
+        "rpm"
+      ],
+      "category": "Utility",
+      "icon": "build/icon.png"
+    },
+    "mac": {
+      "target": "dmg",
+      "category": "public.app-category.utilities",
+      "icon": "build/icon.icns"
+    },
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "icon": "build/icon.ico"
+    }
+  },
+  "keywords": [
+    "vnc",
+    "macos",
+    "remote",
+    "control",
+    "mcp",
+    "viewer"
+  ],
+  "author": "MCP Remote macOS Use",
+  "license": "MIT",
+  "dependencies": {
+    "@novnc/novnc": "^1.4.0",
+    "websockify": "^0.11.0"
+  },
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "electron-builder": "^24.9.1"
+  }
+}

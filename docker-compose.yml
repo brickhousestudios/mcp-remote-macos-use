@@ -1,0 +1,84 @@
+version: '3.8'
+
+services:
+  # Basic MCP Server - Connect to existing Mac via VNC
+  mcp-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mcp-macos-control
+    restart: unless-stopped
+    environment:
+      - MACOS_HOST=${MACOS_HOST:-192.168.1.100}
+      - MACOS_PORT=${MACOS_PORT:-5900}
+      - MACOS_VNC_PASSWORD=${MACOS_VNC_PASSWORD:-}
+      - MACOS_VNC_USERNAME=${MACOS_VNC_USERNAME:-}
+      - MACOS_VNC_ENCRYPTION=${MACOS_VNC_ENCRYPTION:-}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    ports:
+      - "8080:8080"
+    networks:
+      - mcp-network
+    stdin_open: true
+    tty: true
+    volumes:
+      - ./logs:/app/logs
+    profiles:
+      - basic
+
+  # MCP Server with macOS VM (QEMU/KVM)
+  mcp-with-macos-vm:
+    build:
+      context: .
+      dockerfile: Dockerfile.vm
+    container_name: mcp-macos-vm
+    restart: unless-stopped
+    privileged: true  # Required for KVM
+    devices:
+      - /dev/kvm  # KVM device for hardware acceleration
+    environment:
+      - MACOS_HOST=localhost
+      - MACOS_PORT=5900
+      - MACOS_VNC_PASSWORD=${MACOS_VNC_PASSWORD:-}
+      - RAM=${MACOS_VM_RAM:-8G}
+      - CORES=${MACOS_VM_CORES:-4}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    ports:
+      - "8080:8080"   # MCP Server
+      - "5900:5900"   # VNC
+      - "22:10022"    # SSH (optional)
+    networks:
+      - mcp-network
+    volumes:
+      - ./vm-data:/vm-data
+      - ./logs:/app/logs
+    profiles:
+      - vm
+
+  # Development setup with local source mounting
+  mcp-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: builder
+    container_name: mcp-macos-dev
+    restart: unless-stopped
+    environment:
+      - MACOS_HOST=${MACOS_HOST:-localhost}
+      - MACOS_PORT=${MACOS_PORT:-5900}
+      - MACOS_VNC_PASSWORD=${MACOS_VNC_PASSWORD:-}
+      - LOG_LEVEL=DEBUG
+    ports:
+      - "8080:8080"
+    networks:
+      - mcp-network
+    volumes:
+      - ./src:/app/src
+      - ./logs:/app/logs
+    command: python -m mcp_remote_macos_use.server
+    profiles:
+      - dev
+
+networks:
+  mcp-network:
+    driver: bridge
